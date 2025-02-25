@@ -1,9 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import socket
 import json
 import rospy
 from time import sleep
 from std_msgs.msg import String
+from geometry_msgs.msg import TwistWithCovarianceStamped
 from waterlinked_a50_ros_driver.msg import DVL
 from waterlinked_a50_ros_driver.msg import DVLBeam
 import select
@@ -54,6 +55,7 @@ def getData():
 def publisher():
 	pub_raw = rospy.Publisher('dvl/json_data', String, queue_size=10)
 	pub = rospy.Publisher('dvl/data', DVL, queue_size=10)
+	twist_pub = rospy.Publisher('dvl/twist_with_covariance', TwistWithCovarianceStamped, queue_size=10)
 
 	rate = rospy.Rate(10) # 10hz
 	while not rospy.is_shutdown():
@@ -75,49 +77,81 @@ def publisher():
 				continue
 			pub_raw.publish(raw_data)
 
-		theDVL.header.stamp = rospy.Time.now()
-		theDVL.header.frame_id = "dvl_link"
-		theDVL.time = data["time"]
-		theDVL.velocity.x = data["vx"]
-		theDVL.velocity.y = data["vy"]
-		theDVL.velocity.z = data["vz"]
-		theDVL.fom = data["fom"]
-		theDVL.altitude = data["altitude"]
-		theDVL.velocity_valid = data["velocity_valid"]
-		theDVL.status = data["status"]
-		theDVL.form = data["format"]
+		twist_msg = TwistWithCovarianceStamped()
 
-		beam0.id = data["transducers"][0]["id"]
-		beam0.velocity = data["transducers"][0]["velocity"]
-		beam0.distance = data["transducers"][0]["distance"]
-		beam0.rssi = data["transducers"][0]["rssi"]
-		beam0.nsd = data["transducers"][0]["nsd"]
-		beam0.valid = data["transducers"][0]["beam_valid"]
+		# Header
+		twist_msg.header.stamp = data["time"]
+		twist_msg.header.frame_id = "dvl_link"
 
-		beam1.id = data["transducers"][1]["id"]
-		beam1.velocity = data["transducers"][1]["velocity"]
-		beam1.distance = data["transducers"][1]["distance"]
-		beam1.rssi = data["transducers"][1]["rssi"]
-		beam1.nsd = data["transducers"][1]["nsd"]
-		beam1.valid = data["transducers"][1]["beam_valid"]
+		# Set linear velocities (m/s)
+		twist_msg.twist.twist.linear.x = data["vx"]
+		twist_msg.twist.twist.linear.y = data["vy"]
+		twist_msg.twist.twist.linear.z = data["vz"]
 
-		beam2.id = data["transducers"][2]["id"]
-		beam2.velocity = data["transducers"][2]["velocity"]
-		beam2.distance = data["transducers"][2]["distance"]
-		beam2.rssi = data["transducers"][2]["rssi"]
-		beam2.nsd = data["transducers"][2]["nsd"]
-		beam2.valid = data["transducers"][2]["beam_valid"]
+		# Set angular velocities (rad/s)
+		twist_msg.twist.angular.x = 0.0
+		twist_msg.twist.angular.y = 0.0
+		twist_msg.twist.angular.z = 0.0
 
-		beam3.id = data["transducers"][3]["id"]
-		beam3.velocity = data["transducers"][3]["velocity"]
-		beam3.distance = data["transducers"][3]["distance"]
-		beam3.rssi = data["transducers"][3]["rssi"]
-		beam3.nsd = data["transducers"][3]["nsd"]
-		beam3.valid = data["transducers"][3]["beam_valid"]
+		# Set covariance (6x6 matrix as a flat array)
+		covariance = data["covariance"]
+		print("covariance:")
+		print(covariance)
+		print()
+		twist_msg.covariance = [
+			0.1, 0,   0,   0,   0,   0,   # Row 1
+			0,   0.1, 0,   0,   0,   0,   # Row 2
+			0,   0,   0.1, 0,   0,   0,   # Row 3
+			0,   0,   0,   0.1, 0,   0,   # Row 4
+			0,   0,   0,   0,   0.1, 0,   # Row 5
+			0,   0,   0,   0,   0,   0.1  # Row 6
+		]
 
-		theDVL.beams = [beam0, beam1, beam2, beam3]
+		twist_pub.pub(twist_msg)
 
-		pub.publish(theDVL)
+		# theDVL.header.stamp = rospy.Time.now()
+		# theDVL.header.frame_id = "dvl_link"
+		# theDVL.time = data["time"]
+		# theDVL.velocity.x = data["vx"]
+		# theDVL.velocity.y = data["vy"]
+		# theDVL.velocity.z = data["vz"]
+		# theDVL.fom = data["fom"]
+		# theDVL.altitude = data["altitude"]
+		# theDVL.velocity_valid = data["velocity_valid"]
+		# theDVL.status = data["status"]
+		# theDVL.form = data["format"]
+
+		# beam0.id = data["transducers"][0]["id"]
+		# beam0.velocity = data["transducers"][0]["velocity"]
+		# beam0.distance = data["transducers"][0]["distance"]
+		# beam0.rssi = data["transducers"][0]["rssi"]
+		# beam0.nsd = data["transducers"][0]["nsd"]
+		# beam0.valid = data["transducers"][0]["beam_valid"]
+
+		# beam1.id = data["transducers"][1]["id"]
+		# beam1.velocity = data["transducers"][1]["velocity"]
+		# beam1.distance = data["transducers"][1]["distance"]
+		# beam1.rssi = data["transducers"][1]["rssi"]
+		# beam1.nsd = data["transducers"][1]["nsd"]
+		# beam1.valid = data["transducers"][1]["beam_valid"]
+
+		# beam2.id = data["transducers"][2]["id"]
+		# beam2.velocity = data["transducers"][2]["velocity"]
+		# beam2.distance = data["transducers"][2]["distance"]
+		# beam2.rssi = data["transducers"][2]["rssi"]
+		# beam2.nsd = data["transducers"][2]["nsd"]
+		# beam2.valid = data["transducers"][2]["beam_valid"]
+
+		# beam3.id = data["transducers"][3]["id"]
+		# beam3.velocity = data["transducers"][3]["velocity"]
+		# beam3.distance = data["transducers"][3]["distance"]
+		# beam3.rssi = data["transducers"][3]["rssi"]
+		# beam3.nsd = data["transducers"][3]["nsd"]
+		# beam3.valid = data["transducers"][3]["beam_valid"]
+
+		# theDVL.beams = [beam0, beam1, beam2, beam3]
+
+		# pub.publish(theDVL)
 
 		rate.sleep()
 
