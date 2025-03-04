@@ -58,7 +58,7 @@ def getData():
 def publisher():
 	pub_raw = rospy.Publisher('dvl/json_data', String, queue_size=10)
 	pub = rospy.Publisher('dvl/data', DVL, queue_size=10)
-	twist_pub = rospy.Publisher('dvl/twist_with_covariance', TwistWithCovarianceStamped, queue_size=10)
+	twist_pub = rospy.Publisher('dvl/twist', TwistWithCovarianceStamped, queue_size=10)
 
 	rate = rospy.Rate(10) # 10hz
 	while not rospy.is_shutdown():
@@ -104,9 +104,6 @@ def publisher():
 		for i in range(dim):
 			for j in range(dim):
 				twist_msg.twist.covariance[i * 2 * dim + j] = covariance[i][j]
-
-		print("covariance: 6x6")
-		print(twist_msg.twist.covariance)
 
 		twist_pub.publish(twist_msg)
 
