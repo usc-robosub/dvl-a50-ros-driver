@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   geometry_msgs
+  sensor_msgs
   message_generation
 )
 
@@ -74,6 +75,7 @@ generate_messages(
   DEPENDENCIES
   std_msgs
   geometry_msgs
+  sensor_msgs
 )
 
 ################################################
@@ -108,7 +110,7 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES waterlinked_a50
-  CATKIN_DEPENDS roscpp rospy std_msgs geometry_msgs message_runtime
+  CATKIN_DEPENDS roscpp rospy std_msgs geometry_msgs sensor_msgs message_runtime
 #  DEPENDS system_lib
 )
 

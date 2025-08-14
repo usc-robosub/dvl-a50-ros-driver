@@ -3,7 +3,8 @@ import socket
 import json
 import rospy
 from time import sleep
-from std_msgs.msg import String
+from std_msgs.msg import String, Header
+from sensor_msgs.msg import Range
 from waterlinked_a50_ros_driver.msg import DVL
 from waterlinked_a50_ros_driver.msg import DVLBeam
 import select
@@ -50,10 +51,33 @@ def getData():
 	raw_data = raw_data[0]
 	return raw_data
 
+def create_altitude_range_msg(altitude, velocity_valid, timestamp):
+	"""Create a Range message from DVL altitude data"""
+	range_msg = Range()
+	
+	# Header
+	range_msg.header = Header()
+	range_msg.header.stamp = timestamp
+	range_msg.header.frame_id = "dvl_link"
+	
+	# DVL A50 specifications
+	range_msg.radiation_type = Range.ULTRASOUND
+	range_msg.field_of_view = 0.26  # ~15 degrees beam angle in radians
+	range_msg.min_range = 0.05      # 5cm minimum altitude
+	range_msg.max_range = 50.0      # 50m maximum altitude
+	
+	# Set range value - altitude is already a float from JSON
+	if velocity_valid and 0.05 <= altitude <= 50.0:
+		range_msg.range = altitude
+	else:
+		range_msg.range = float('inf')  # Invalid reading
+		
+	return range_msg
 
 def publisher():
 	pub_raw = rospy.Publisher('dvl/json_data', String, queue_size=10)
 	pub = rospy.Publisher('dvl/data', DVL, queue_size=10)
+	pub_altitude = rospy.Publisher('dvl/altitude', Range, queue_size=10)
 
 	rate = rospy.Rate(10) # 10hz
 	while not rospy.is_shutdown():
@@ -75,7 +99,10 @@ def publisher():
 				continue
 			pub_raw.publish(raw_data)
 
-		theDVL.header.stamp = rospy.Time.now()
+		# Create timestamp for all messages
+		current_time = rospy.Time.now()
+
+		theDVL.header.stamp = current_time
 		theDVL.header.frame_id = "dvl_link"
 		theDVL.time = data["time"]
 		theDVL.velocity.x = data["vx"]
@@ -117,7 +144,16 @@ def publisher():
 
 		theDVL.beams = [beam0, beam1, beam2, beam3]
 
+		# Publish DVL data
 		pub.publish(theDVL)
+
+		# Create and publish altitude Range message
+		altitude_range_msg = create_altitude_range_msg(
+			altitude=data["altitude"],  # This is a float from JSON
+			velocity_valid=data["velocity_valid"],
+			timestamp=current_time
+		)
+		pub_altitude.publish(altitude_range_msg)
 
 		rate.sleep()
 
